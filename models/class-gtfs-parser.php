@@ -101,6 +101,176 @@ class GTFS_Parser {
             $rules_count = $this->import_fare_rules($fare_rules_file, $fare_model);
             
             $results['fares'] = $attributes_count;
+            /**
+ * Import fare attributes from fare_attributes.txt
+ *
+ * @param string $fare_attributes_file Path to fare_attributes.txt
+ * @param GTFS_Fare_Model $fare_model Fare model object
+ * @return int Number of fare attributes imported
+ * @throws Exception If file can't be read or parsed
+ */
+private function import_fare_attributes($fare_attributes_file, $fare_model) {
+    if (!file_exists($fare_attributes_file)) {
+        return 0; // Skip if file doesn't exist
+    }
+    
+    $handle = fopen($fare_attributes_file, 'r');
+    if (!$handle) {
+        throw new Exception(__('Unable to open fare_attributes.txt for reading.', 'gtfs-importer'));
+    }
+    
+    // Get CSV headers and normalize them
+    $headers = fgetcsv($handle);
+    if (!$headers) {
+        fclose($handle);
+        throw new Exception(__('Invalid fare_attributes.txt format or empty file.', 'gtfs-importer'));
+    }
+    
+    // Find required columns
+    $idx_fare_id = $this->find_column($headers, array('fare_id'));
+    $idx_price = $this->find_column($headers, array('price'));
+    $idx_currency = $this->find_column($headers, array('currency_type'));
+    $idx_payment_method = $this->find_column($headers, array('payment_method'));
+    $idx_transfers = $this->find_column($headers, array('transfers'));
+    $idx_duration = $this->find_column($headers, array('transfer_duration'));
+    $idx_agency = $this->find_column($headers, array('agency_id'));
+    
+    if ($idx_fare_id === false || $idx_price === false || $idx_currency === false || $idx_payment_method === false) {
+        fclose($handle);
+        throw new Exception(__('Required columns missing in fare_attributes.txt', 'gtfs-importer'));
+    }
+    
+    $count = 0;
+    
+    // Process the file line by line
+    while (($row = fgetcsv($handle)) !== false) {
+        if (count($row) < count($headers)) {
+            continue; // Skip malformed rows
+        }
+        
+        $fare_id = $row[$idx_fare_id] ?? '';
+        $price = $row[$idx_price] ?? '';
+        $currency = $row[$idx_currency] ?? '';
+        $payment_method = $row[$idx_payment_method] ?? '';
+        
+        if (empty($fare_id) || empty($price) || empty($currency) || empty($payment_method)) {
+            continue; // Skip rows with missing required fields
+        }
+        
+        $fare_data = array(
+            'fare_id' => $fare_id,
+            'price' => $price,
+            'currency_type' => $currency,
+            'payment_method' => $payment_method
+        );
+        
+        // Add optional fields if they exist
+        if ($idx_transfers !== false && isset($row[$idx_transfers])) {
+            $fare_data['transfers'] = $row[$idx_transfers];
+        }
+        
+        if ($idx_duration !== false && isset($row[$idx_duration])) {
+            $fare_data['transfer_duration'] = $row[$idx_duration];
+        }
+        
+        if ($idx_agency !== false && isset($row[$idx_agency])) {
+            $fare_data['agency_id'] = $row[$idx_agency];
+        }
+        
+        $result = $fare_model->insert_fare_attribute($fare_data);
+        
+        if ($result) {
+            $count++;
+        }
+    }
+    
+    fclose($handle);
+    return $count;
+}
+
+/**
+ * Import fare rules from fare_rules.txt
+ *
+ * @param string $fare_rules_file Path to fare_rules.txt
+ * @param GTFS_Fare_Model $fare_model Fare model object
+ * @return int Number of fare rules imported
+ * @throws Exception If file can't be read or parsed
+ */
+private function import_fare_rules($fare_rules_file, $fare_model) {
+    if (!file_exists($fare_rules_file)) {
+        return 0; // Skip if file doesn't exist
+    }
+    
+    $handle = fopen($fare_rules_file, 'r');
+    if (!$handle) {
+        throw new Exception(__('Unable to open fare_rules.txt for reading.', 'gtfs-importer'));
+    }
+    
+    // Get CSV headers and normalize them
+    $headers = fgetcsv($handle);
+    if (!$headers) {
+        fclose($handle);
+        throw new Exception(__('Invalid fare_rules.txt format or empty file.', 'gtfs-importer'));
+    }
+    
+    // Find required columns
+    $idx_fare_id = $this->find_column($headers, array('fare_id'));
+    $idx_route_id = $this->find_column($headers, array('route_id'));
+    $idx_origin_id = $this->find_column($headers, array('origin_id'));
+    $idx_destination_id = $this->find_column($headers, array('destination_id'));
+    $idx_contains_id = $this->find_column($headers, array('contains_id'));
+    
+    if ($idx_fare_id === false) {
+        fclose($handle);
+        throw new Exception(__('Required column fare_id missing in fare_rules.txt', 'gtfs-importer'));
+    }
+    
+    $count = 0;
+    
+    // Process the file line by line
+    while (($row = fgetcsv($handle)) !== false) {
+        if (count($row) < count($headers)) {
+            continue; // Skip malformed rows
+        }
+        
+        $fare_id = $row[$idx_fare_id] ?? '';
+        
+        if (empty($fare_id)) {
+            continue; // Skip rows with missing fare_id
+        }
+        
+        $rule_data = array(
+            'fare_id' => $fare_id
+        );
+        
+        // Add optional fields if they exist
+        if ($idx_route_id !== false && isset($row[$idx_route_id]) && !empty($row[$idx_route_id])) {
+            $rule_data['route_id'] = $row[$idx_route_id];
+        }
+        
+        if ($idx_origin_id !== false && isset($row[$idx_origin_id]) && !empty($row[$idx_origin_id])) {
+            $rule_data['origin_id'] = $row[$idx_origin_id];
+        }
+        
+        if ($idx_destination_id !== false && isset($row[$idx_destination_id]) && !empty($row[$idx_destination_id])) {
+            $rule_data['destination_id'] = $row[$idx_destination_id];
+        }
+        
+        if ($idx_contains_id !== false && isset($row[$idx_contains_id]) && !empty($row[$idx_contains_id])) {
+            $rule_data['contains_id'] = $row[$idx_contains_id];
+        }
+        
+        $result = $fare_model->insert_fare_rule($rule_data);
+        
+        if ($result) {
+            $count++;
+        }
+    }
+    
+    fclose($handle);
+    return $count;
+}
+
         }
         
         // ... [existing commit code] ...
