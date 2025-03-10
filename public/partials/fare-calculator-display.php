@@ -1,3 +1,11 @@
+<?php
+/**
+ * Template for fare calculator display
+ *
+ * @package    GTFS_Importer
+ * @subpackage GTFS_Importer/public/partials
+ */
+?>
 <div class="gtfs-container">
     <div class="gtfs-fare-calculator">
         <h3><?php echo esc_html($atts['title']); ?></h3>
